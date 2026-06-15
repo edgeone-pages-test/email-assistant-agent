@@ -29,9 +29,10 @@ from typing import Any, Mapping
 
 REQUIRED_ENV = ("AI_GATEWAY_API_KEY", "AI_GATEWAY_BASE_URL")
 
-# Default model — keep aligned with sibling templates so the platform-wide
-# model strategy stays unified.
-DEFAULT_MODEL = "@makers/deepseek-v4-flash"
+# Default model — overridable via AI_GATEWAY_MODEL env var. Falls back to the
+# platform's built-in free model when the variable isn't set.
+_FALLBACK_MODEL = "@makers/deepseek-v4-flash"
+DEFAULT_MODEL = _FALLBACK_MODEL  # resolved at runtime in get_env()
 
 GATEWAY_HEADERS: dict[str, str] = {}
 
@@ -66,11 +67,23 @@ def reset_singletons() -> None:
 
 
 def get_env(context_env: Mapping[str, str] | None) -> dict[str, str]:
-    """Validate and extract required env vars from ``context.env``."""
+    """Validate and extract required env vars from ``context.env``.
+
+    Also reads the optional ``AI_GATEWAY_MODEL`` and updates the module-level
+    ``DEFAULT_MODEL`` so all callers pick up the user's preferred model without
+    needing to pass it through every layer.
+    """
+    global DEFAULT_MODEL
     source = dict(context_env or {})
     missing = [k for k in REQUIRED_ENV if not (source.get(k) or "").strip()]
     if missing:
         raise RuntimeError(f"Missing environment variables: {', '.join(missing)}")
+    # Optional model override
+    model_override = (source.get("AI_GATEWAY_MODEL") or "").strip()
+    if model_override:
+        DEFAULT_MODEL = model_override
+    else:
+        DEFAULT_MODEL = _FALLBACK_MODEL
     return {k: source[k] for k in REQUIRED_ENV}
 
 

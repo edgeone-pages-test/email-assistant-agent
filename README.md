@@ -21,7 +21,7 @@ AI Email Assistant processes an inbox end-to-end: it fetches emails, classifies 
 |----------|----------|-------------|
 | `AI_GATEWAY_API_KEY` | Yes | Model gateway API key. Use your **Makers Models API Key**, or any OpenAI-compatible provider key. |
 | `AI_GATEWAY_BASE_URL` | Yes | Gateway base URL. For Makers Models, use `https://ai-gateway.edgeone.link/v1`. |
-| `AI_GATEWAY_MODEL` | No | Model ID. Defaults to `@makers/hy3-preview` (a free built-in model). |
+| `AI_GATEWAY_MODEL` | No | Model ID. Defaults to `@makers/deepseek-v4-flash`. |
 | `EMAIL_PROVIDER` | No | `mock` (default) or `imap`. Controls the email data source. |
 | `IMAP_HOST` | No | IMAP server hostname (e.g. `imap.gmail.com`). Required when `EMAIL_PROVIDER=imap`. |
 | `IMAP_USER` | No | IMAP login username / email address. |

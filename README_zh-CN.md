@@ -21,7 +21,7 @@ AI 邮件助手端到端处理收件箱：拉取邮件、LLM 分类、按用户�
 |------|------|------|
 | `AI_GATEWAY_API_KEY` | 是 | 模型网关 API Key。使用 **Makers Models API Key**，或任何 OpenAI 兼容的服务商密钥。 |
 | `AI_GATEWAY_BASE_URL` | 是 | 网关 Base URL。Makers Models 填 `https://ai-gateway.edgeone.link/v1`。 |
-| `AI_GATEWAY_MODEL` | 否 | 模型 ID。默认 `@makers/hy3-preview`（免费内置模型）。 |
+| `AI_GATEWAY_MODEL` | 否 | 模型 ID。默认 `@makers/deepseek-v4-flash`。 |
 | `EMAIL_PROVIDER` | 否 | `mock`（默认）或 `imap`。控制邮件数据来源。 |
 | `IMAP_HOST` | 否 | IMAP 服务器地址（如 `imap.gmail.com`）。`EMAIL_PROVIDER=imap` 时必填。 |
 | `IMAP_USER` | 否 | IMAP 登录用户名 / 邮箱地址。 |
