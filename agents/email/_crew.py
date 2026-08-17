@@ -18,6 +18,14 @@ from typing import Any
 from _models import ClassifiedEmail, UserRulesBundle
 
 
+def _llm_model(llm: Any) -> str | None:
+    """Best-effort model name from the LLM object (or None if unavailable)."""
+    model = getattr(llm, "model", None)
+    if isinstance(model, str) and model.strip():
+        return model
+    return None
+
+
 def _shorten(text: str, limit: int = 4000) -> str:
     """Trim very long bodies before stuffing into a prompt."""
     text = text or ""
@@ -74,5 +82,5 @@ def build_email_draft_crew(
         "signature": rules.signature,
     }
 
-    crew_instance = EmailDraftCrew().crew()
+    crew_instance = EmailDraftCrew(model=_llm_model(llm)).crew()
     return crew_instance, inputs

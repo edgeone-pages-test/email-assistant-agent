@@ -21,6 +21,8 @@ kickoff time using the ``inputs`` dict.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from crewai import Agent, Crew, Process, Task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
@@ -41,6 +43,30 @@ def _get_llm():
     return get_crewai_llm(env)
 
 
+def _resolve_model() -> str:
+    """Best-effort resolution of the runtime model name.
+
+    Prefers ``AI_GATEWAY_MODEL`` so the fallback used by ``_llm.get_env()``
+    stays the source of truth; falls back to the same default otherwise.
+    """
+    import os
+    from _llm import _FALLBACK_MODEL
+
+    return os.environ.get("AI_GATEWAY_MODEL", "") or _FALLBACK_MODEL
+
+
+def _supports_structured_output(model: str | None) -> bool:
+    """Whether the model accepts ``response_format`` with a JSON schema.
+
+    The AI Gateway's DeepSeek mapping rejects ``json_schema`` (used by
+    ``output_pydantic`` / structured output) with 400001. Other models such
+    as ``@makers/hy3`` accept it. When in doubt, be conservative and keep
+    structured output enabled.
+    """
+    name = (model or "").lower()
+    return "deepseek" not in name
+
+
 @CrewBase
 class EmailDraftCrew:
     """Three-role sequential crew for drafting one email reply.
@@ -53,6 +79,14 @@ class EmailDraftCrew:
 
     agents_config = "../agents.yaml"
     tasks_config = "config/tasks.yaml"
+
+    def __init__(self, *, model: str | None = None):
+        # Use ``object.__init__`` explicitly: the CrewBase metaclass rebuilds
+        # this class with ``object`` as its only base, so a bare ``super()``
+        # is unresolvable and raises TypeError. ``object.__init__`` also
+        # rejects arbitrary kwargs, hence the narrow signature above.
+        object.__init__(self)
+        self._model = model or _resolve_model()
 
     @agent
     def email_triage_analyst(self) -> Agent:
@@ -104,12 +138,15 @@ class EmailDraftCrew:
 
     @task
     def polish_task(self) -> Task:
-        return Task(
-            config=self.tasks_config["polish_task"],  # type: ignore[index]
-            agent=self.voice_polisher(),
-            context=[self.draft_task(), self.analyze_task()],
-            output_pydantic=DraftItem,
-        )
+        use_structured = _supports_structured_output(self._model)
+        task_kwargs: dict[str, Any] = {
+            "config": self.tasks_config["polish_task"],  # type: ignore[index]
+            "agent": self.voice_polisher(),
+            "context": [self.draft_task(), self.analyze_task()],
+        }
+        if use_structured:
+            task_kwargs["output_pydantic"] = DraftItem
+        return Task(**task_kwargs)
 
     @crew
     def crew(self) -> Crew:
