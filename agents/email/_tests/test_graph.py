@@ -358,7 +358,7 @@ def test_summarize_with_llm_returns_text():
     assert "概览" in out["summary"]
     # W2 D4: summarize injects the email-tone Skill into its system prompt
     system_msg = client.chat.completions.calls[0]["messages"][0]["content"]
-    assert "Skill: email-tone" in system_msg or "邮件助手的总结员" in system_msg
+    assert "Skill: email-tone" in system_msg or "summarizer of an email assistant" in system_msg
 
 
 def test_summarize_llm_failure_falls_back():

@@ -164,7 +164,7 @@ export default function HistorySidebar({
                 cursor: isActive ? 'default' : busy ? 'wait' : 'pointer',
                 opacity: !isActive && busy ? 0.6 : 1,
               }}
-              title={isActive ? '当前会话' : '切换到这个会话'}
+              title={isActive ? t('historyCurrentSession') : t('historySwitchTo')}
             >
               <div style={titleRow}>
                 <span
@@ -176,20 +176,20 @@ export default function HistorySidebar({
                       : tokens.fontWeight.medium,
                   }}
                 >
-                  {trimmed(item.title)}
+                  {trimmed(item.title, t)}
                 </span>
                 <button
                   type="button"
                   onClick={(e) => handleDelete(item.id, e)}
                   style={deleteBtn}
-                  title="删除这个会话"
-                  aria-label={`删除 ${item.title}`}
+                  title={t('historyDeleteTitle')}
+                  aria-label={t('historyDeleteAria', { title: item.title })}
                 >
                   <Icon name="trash-2" size={11} />
                 </button>
               </div>
               <div style={metaRow}>
-                <span>{relativeTime(item.updatedAt)}</span>
+                <span>{relativeTime(item.updatedAt, t)}</span>
               </div>
             </li>
           );
@@ -201,23 +201,28 @@ export default function HistorySidebar({
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-function trimmed(t: string): string {
+function trimmed(t: string, tr: (key: 'historyUntitled') => string): string {
   // The platform "[task] xxx" prefix in stored titles is good for
   // identification but visually heavy. Strip it for display.
   const stripped = t.replace(/^\s*\[task\]\s*/i, '').trim();
-  return stripped.length > 36 ? stripped.slice(0, 36) + '…' : stripped || '(无标题)';
+  return stripped.length > 36 ? stripped.slice(0, 36) + '…' : stripped || tr('historyUntitled');
 }
 
-function relativeTime(ts: number): string {
+type RelTimeT = (
+  key: 'relJustNow' | 'relMinutesAgo' | 'relHoursAgo' | 'relDaysAgo',
+  vars?: Record<string, string | number>,
+) => string;
+
+function relativeTime(ts: number, t: RelTimeT): string {
   if (!ts) return '';
   const diff = Date.now() - ts;
   const minute = 60_000;
   const hour = 60 * minute;
   const day = 24 * hour;
-  if (diff < minute) return '刚刚';
-  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
-  if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
-  if (diff < 7 * day) return `${Math.floor(diff / day)} 天前`;
+  if (diff < minute) return t('relJustNow');
+  if (diff < hour) return t('relMinutesAgo', { n: Math.floor(diff / minute) });
+  if (diff < day) return t('relHoursAgo', { n: Math.floor(diff / hour) });
+  if (diff < 7 * day) return t('relDaysAgo', { n: Math.floor(diff / day) });
   // Older than a week: show abs date "5/22"
   const d = new Date(ts);
   return `${d.getMonth() + 1}/${d.getDate()}`;

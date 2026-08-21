@@ -22,6 +22,10 @@ export interface RunEmailOptions {
   task: RunTask;
   conversationId: string;
   signal?: AbortSignal;
+  /** UI locale ("zh" | "en") from useI18n(). The backend uses it to pick
+   * the reply-draft language, the digest language, and all SSE narration
+   * strings, so the agent's output always matches what the user sees. */
+  locale: 'zh' | 'en';
   /**
    * Optional snapshot of a previously-classified inbox. When present, the
    * backend ``fetch`` and ``classify`` nodes short-circuit, saving one IMAP
@@ -54,10 +58,13 @@ export interface SubmitReviewOptions {
   conversationId: string;
   decision: ReviewDecisionInput;
   signal?: AbortSignal;
+  /** UI locale — drives the decision/draft-preview labels review.py writes
+   * into chat history. */
+  locale: 'zh' | 'en';
 }
 
 export async function* runEmailAssistant(opts: RunEmailOptions): AsyncGenerator<SSEFrame> {
-  const body: Record<string, unknown> = { task: opts.task };
+  const body: Record<string, unknown> = { task: opts.task, locale: opts.locale };
   if (opts.preloadedClassified && opts.preloadedClassified.length > 0) {
     body.preloaded_classified = opts.preloadedClassified;
   }
@@ -77,7 +84,7 @@ export async function* submitReview(opts: SubmitReviewOptions): AsyncGenerator<S
   // Backend expects ``decision`` field name; ReviewDecisionInput already has ``action`` etc.
   // Map ``action`` → ``decision`` for the wire format consumed by review.py.
   const { action, edited_body, feedback } = opts.decision;
-  const wireBody: Record<string, unknown> = { decision: action };
+  const wireBody: Record<string, unknown> = { decision: action, locale: opts.locale };
   if (edited_body !== undefined) wireBody.edited_body = edited_body;
   if (feedback !== undefined) wireBody.feedback = feedback;
   yield* streamSSE('/email/review', wireBody, opts.conversationId, opts.signal);

@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { tokens } from '../design-tokens';
+import { useI18n, type TranslationKey } from '../i18n';
 import { Icon } from '../icons';
 import type { ClassifiedEmail, DraftItem, EmailCategory } from '../types';
 
@@ -24,19 +25,20 @@ interface Props {
   onClose: () => void;
 }
 
-const CATEGORY_LABEL: Record<EmailCategory, string> = {
-  urgent_customer: '紧急客户',
-  meeting: '会议',
-  internal: '内部',
-  marketing: '营销',
-  notification: '通知',
-  followup: '跟进',
-  spam: '垃圾',
-  billing: '账单',
-  other: '其他',
+const CATEGORY_LABEL_KEY: Record<EmailCategory, TranslationKey> = {
+  urgent_customer: 'catUrgentCustomer',
+  meeting: 'catMeeting',
+  internal: 'catInternal',
+  marketing: 'catMarketing',
+  notification: 'catNotification',
+  followup: 'catFollowup',
+  spam: 'catSpam',
+  billing: 'catBilling',
+  other: 'catOther',
 };
 
 export default function EmailDetailDrawer({ email, draft, isOpen, onClose }: Props) {
+  const { t } = useI18n();
   // Escape key to close
   useEffect(() => {
     if (!isOpen) return;
@@ -59,7 +61,7 @@ export default function EmailDetailDrawer({ email, draft, isOpen, onClose }: Pro
         style={drawer}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label="邮件详情"
+        aria-label={t('drawerAriaLabel')}
       >
         <DrawerHeader email={email} draft={draft} onClose={onClose} />
         <div style={body}>
@@ -84,29 +86,31 @@ function DrawerHeader({
   draft: DraftItem | null;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <header style={header}>
-      <button onClick={onClose} style={closeBtn} title="关闭 (Esc)">
+      <button onClick={onClose} style={closeBtn} title={t('drawerCloseTitle')}>
         <Icon name="x" size={16} strokeWidth={2} />
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={headerTitle}>
-          {(email.email.subject || '(无主题)').slice(0, 60)}
+          {(email.email.subject || t('noSubjectDraft')).slice(0, 60)}
         </div>
         <div style={headerSender}>
           {email.email.sender || email.email.from_ || (email.email as { from?: string }).from || ''}
         </div>
       </div>
-      {draft && <CopyButton text={draft.body} label="复制草稿" />}
+      {draft && <CopyButton text={draft.body} label={t('drawerCopyDraft')} />}
     </header>
   );
 }
 
 function MetaSection({ email }: { email: ClassifiedEmail }) {
+  const { t } = useI18n();
   const e = email.email;
-  const sender = e.sender || e.from_ || (e as { from?: string }).from || '(未知发件人)';
+  const sender = e.sender || e.from_ || (e as { from?: string }).from || t('drawerUnknownSender');
   const received = e.received_at
-    ? new Date(e.received_at).toLocaleString('zh-CN', {
+    ? new Date(e.received_at).toLocaleString(undefined, {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -117,14 +121,14 @@ function MetaSection({ email }: { email: ClassifiedEmail }) {
     <section style={section}>
       <div style={sectionHeader}>
         <Icon name="mail" size={12} />
-        <span>邮件信息</span>
+        <span>{t('drawerMetaTitle')}</span>
       </div>
       <div style={metaGrid}>
-        <MetaRow label="发件人" value={sender} />
-        <MetaRow label="收件人" value={e.to?.join(', ') || ''} />
-        <MetaRow label="主题" value={e.subject || '(无主题)'} />
-        {received && <MetaRow label="时间" value={received} />}
-        {e.has_ics && <MetaRow label="附件" value="日历邀请 (.ics)" />}
+        <MetaRow label={t('drawerFrom')} value={sender} />
+        <MetaRow label={t('drawerTo')} value={e.to?.join(', ') || ''} />
+        <MetaRow label={t('drawerSubject')} value={e.subject || t('noSubjectDraft')} />
+        {received && <MetaRow label={t('drawerTime')} value={received} />}
+        {e.has_ics && <MetaRow label={t('drawerAttachment')} value={t('drawerIcs')} />}
       </div>
     </section>
   );
@@ -140,12 +144,13 @@ function MetaRow({ label, value }: { label: string; value: string }) {
 }
 
 function ClassificationSection({ email }: { email: ClassifiedEmail }) {
-  const catLabel = CATEGORY_LABEL[email.category] || email.category;
+  const { t } = useI18n();
+  const catLabel = t(CATEGORY_LABEL_KEY[email.category] ?? 'catOther') || email.category;
   return (
     <section style={section}>
       <div style={sectionHeader}>
         <Icon name="sparkles" size={12} />
-        <span>AI 分类</span>
+        <span>{t('drawerClassTitle')}</span>
       </div>
       <div style={classificationWrap}>
         <div style={classChips}>
@@ -153,11 +158,11 @@ function ClassificationSection({ email }: { email: ClassifiedEmail }) {
             {catLabel}
           </span>
           <span style={{ ...chip, ...priorityChipColor(email.priority) }}>
-            优先级 {email.priority}
+            {t('drawerPriority', { n: email.priority })}
           </span>
           {email.needs_reply && (
             <span style={{ ...chip, color: tokens.color.success, borderColor: '#bbf7d0', background: tokens.color.successSoft }}>
-              需要回复
+              {t('drawerNeedsReply')}
             </span>
           )}
         </div>
@@ -170,16 +175,17 @@ function ClassificationSection({ email }: { email: ClassifiedEmail }) {
 }
 
 function OriginalBodySection({ email }: { email: ClassifiedEmail }) {
+  const { t } = useI18n();
   const hasHtml = !!email.email.body_html;
   const [viewMode, setViewMode] = useState<'html' | 'text'>(hasHtml ? 'html' : 'text');
-  const bodyText = email.email.body_text || '(邮件正文为空)';
+  const bodyText = email.email.body_text || t('drawerEmptyBody');
 
   return (
     <section style={section}>
       <div style={{ ...sectionHeader, justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Icon name="eye" size={12} />
-          <span>原邮件</span>
+          <span>{t('drawerOriginalTitle')}</span>
         </div>
         {hasHtml && (
           <div style={viewToggle}>
@@ -201,7 +207,7 @@ function OriginalBodySection({ email }: { email: ClassifiedEmail }) {
                 ...(viewMode === 'text' ? viewToggleBtnActive : {}),
               }}
             >
-              纯文本
+              {t('drawerPlainText')}
             </button>
           </div>
         )}
@@ -211,7 +217,7 @@ function OriginalBodySection({ email }: { email: ClassifiedEmail }) {
           sandbox="allow-popups allow-popups-to-escape-sandbox"
           srcDoc={`<style>body{margin:8px;overflow-x:auto;word-break:break-word;overflow-wrap:break-word;font-family:system-ui,sans-serif;font-size:14px;line-height:1.6}img{max-width:100%;height:auto}table{max-width:100%;border-collapse:collapse;overflow-wrap:break-word}td,th{word-break:break-word;overflow-wrap:break-word}pre,code{white-space:pre-wrap;max-width:100%}blockquote{margin-left:8px;padding-left:8px;border-left:3px solid #e5e7eb}</style>${email.email.body_html!}`}
           style={htmlIframe}
-          title="邮件原文"
+          title={t('drawerOriginalTitle')}
         />
       ) : (
         <div style={emailBody}>{bodyText}</div>
@@ -221,14 +227,15 @@ function OriginalBodySection({ email }: { email: ClassifiedEmail }) {
 }
 
 function DraftSection({ draft }: { draft: DraftItem | null }) {
+  const { t } = useI18n();
   if (!draft) {
     return (
       <section style={section}>
         <div style={sectionHeader}>
           <Icon name="edit-3" size={12} />
-          <span>草稿</span>
+          <span>{t('drawerDraftTitle')}</span>
         </div>
-        <p style={emptyDraft}>尚未生成草稿</p>
+        <p style={emptyDraft}>{t('drawerNoDraft')}</p>
       </section>
     );
   }
@@ -237,13 +244,13 @@ function DraftSection({ draft }: { draft: DraftItem | null }) {
       <div style={{ ...sectionHeader, justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Icon name="edit-3" size={12} />
-          <span>草稿</span>
+          <span>{t('drawerDraftTitle')}</span>
         </div>
-        <CopyButton text={draft.body} label="复制" />
+        <CopyButton text={draft.body} label={t('drawerCopy')} />
       </div>
       <div style={draftMeta}>
-        <span>收件人: {draft.to.join(', ')}</span>
-        <span>语气: {draft.tone}</span>
+        <span>{t('draftToLabel')} {draft.to.join(', ')}</span>
+        <span>{t('draftToneLabel')} {draft.tone}</span>
       </div>
       <div style={draftBody}>{draft.body}</div>
     </section>
@@ -251,6 +258,7 @@ function DraftSection({ draft }: { draft: DraftItem | null }) {
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
@@ -275,10 +283,10 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     <button
       onClick={(e) => { e.stopPropagation(); handleCopy(); }}
       style={copyBtn}
-      title="复制到剪贴板"
+      title={t('drawerCopyTitle')}
     >
       <Icon name={copied ? 'check' : 'clipboard'} size={12} strokeWidth={2} />
-      <span>{copied ? '已复制' : label}</span>
+      <span>{copied ? t('drawerCopied') : label}</span>
     </button>
   );
 }

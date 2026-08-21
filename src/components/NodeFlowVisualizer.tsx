@@ -179,6 +179,7 @@ function NodeMarker({
  * because a previous run's data was still valid. Distinguishes "we did
  * the work" (✓ 完成 in green) from "we reused what we had" (⚡ 缓存 in grey). */
 function CachedPill() {
+  const { t } = useI18n();
   return (
     <span
       style={{
@@ -195,24 +196,25 @@ function CachedPill() {
         border: `1px solid ${tokens.color.border}`,
         fontWeight: tokens.fontWeight.medium,
       }}
-      title="复用了上次的结果,没有真的访问邮箱 / LLM"
+      title={t('cachedPillTitle')}
     >
       <Icon name="zap" size={10} strokeWidth={2.5} />
-      <span>缓存</span>
+      <span>{t('cachedPillLabel')}</span>
     </span>
   );
 }
 
 function StatusPill({ status }: { status: NodeStatus }) {
+  const { t } = useI18n();
   if (status === 'pending') return null;
   const label =
     status === 'active'
-      ? '进行中'
+      ? t('nodeActive')
       : status === 'paused'
-      ? '已暂停'
+      ? t('nodePaused')
       : status === 'done'
-      ? '完成'
-      : '出错';
+      ? t('nodeDone')
+      : t('nodeError');
   return (
     <span
       style={{

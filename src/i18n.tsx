@@ -130,6 +130,116 @@ const translations = {
 
     // Misc
     loading: '正在加载会话...',
+
+    // Session / task labels (timeline "Session" bubbles)
+    sessionStarted: '会话已开启',
+    taskLabelTriage: '仅分类邮件',
+    taskLabelDaily: '处理待回邮件',
+    taskLabelSingle: '单独处理某封邮件',
+
+    // One-shot task summaries emitted on first prioritize result
+    classifyDoneTriage: '📥 已分类 {count} 封邮件 — 仅分类模式不会起草回复,左栏可查看分类详情',
+    singleReplyHit: '🎯 单独处理这 1 封邮件,即将起草',
+    singleReplyMiss: '🎯 这封邮件没在缓存里 — 试试上方「强制刷新」拉一次',
+    digestHasDrafts: '📥 收到 {total} 封邮件,其中 {need} 封需要起草回复 — 接下来会逐封请你审批',
+    digestNoDrafts: '📥 收到 {count} 封邮件,本批没有需要起草回复的',
+
+    // HITL review prompt
+    reviewPrompt: '请人工审核:{subject}',
+    draftNoSubjectHint: '(草稿没标题 — 通常是 LLM 没填好,后端会兜底加 Re:)',
+
+    // Streaming bubble eyebrows
+    streamingSummary: '正在写日报…',
+    streamingDraft: '正在起草回复…',
+
+    // Run lifecycle
+    cancelled: '已取消',
+    stopped: '⏹ 已停止',
+    backendError: '后端报错',
+    checkpointWarning: '⚠ 后端要求重审同一封邮件({id})。\n通常意味着 LangGraph checkpointer 没持久化(本地 dev 默认 in-memory),\n每次请求新进程就丢了之前的状态。',
+    restoredToReview: '↩ 已恢复到上次中断的审批位置 — 继续处理这封邮件',
+    loadSessionFailed: '加载会话失败: {msg}',
+
+    // Decision echo labels (timeline bubbles for user decisions)
+    decApprove: '✓ 通过',
+    decApproveEdited: '✓ 通过(编辑)',
+    decEdit: '✏️ 用我改的版本',
+    decReject: '✗ 不回复',
+    decRegenerate: '↻ 重写',
+    decRegenerateWith: '↻ 重写:{feedback}',
+    decSkip: '↦ 跳过',
+
+    // Runtime status chip (header)
+    chipAwaiting: '等待审批',
+    chipAwaitingCount: '等待审批 · {i} / {t}',
+    chipRunning: '运行中',
+    chipRunningCount: '运行中 · {i} / {t}',
+    chipDone: '已完成',
+    chipDoneCount: '已完成 · {i} / {t}',
+
+    // DraftReviewCard
+    noSubjectDraft: '(无主题)',
+    draftToLabel: '收件人:',
+    draftToneLabel: '语气:',
+    draftRemainingPrefix: ' · 还有 ',
+    draftRemainingSuffix: ' 封排队',
+    draftConfidenceTitle: '模型对此草稿的置信度',
+
+    // EmailDetailDrawer
+    drawerAriaLabel: '邮件详情',
+    drawerCloseTitle: '关闭 (Esc)',
+    drawerCopyDraft: '复制草稿',
+    drawerUnknownSender: '(未知发件人)',
+    drawerMetaTitle: '邮件信息',
+    drawerFrom: '发件人',
+    drawerTo: '收件人',
+    drawerSubject: '主题',
+    drawerTime: '时间',
+    drawerAttachment: '附件',
+    drawerIcs: '日历邀请 (.ics)',
+    drawerClassTitle: 'AI 分类',
+    drawerPriority: '优先级 {n}',
+    drawerNeedsReply: '需要回复',
+    drawerOriginalTitle: '原邮件',
+    drawerPlainText: '纯文本',
+    drawerEmptyBody: '(邮件正文为空)',
+    drawerDraftTitle: '草稿',
+    drawerNoDraft: '尚未生成草稿',
+    drawerCopy: '复制',
+    drawerCopyTitle: '复制到剪贴板',
+    drawerCopied: '已复制',
+
+    // EmailInboxTree
+    filterToggleTitle: '展开/收起筛选',
+    searchPlaceholder: '搜索主题/发件人...',
+    clearSearchTitle: '清空搜索',
+    filterResult: '显示 {shown} / {total} 封',
+    refreshBannerTitle: '新任务正在重新拉取并分类邮件,完成后会刷新这里',
+    refreshBannerText: '正在重新拉取...',
+    needsReplyTitle: '需要回复',
+    noReplyNeededTitle: '不需要回复',
+
+    // NodeFlowVisualizer
+    cachedPillTitle: '复用了上次的结果,没有真的访问邮箱 / LLM',
+    cachedPillLabel: '缓存',
+    nodeActive: '进行中',
+    nodePaused: '已暂停',
+    nodeDone: '完成',
+    nodeError: '出错',
+
+    // HistorySidebar
+    historyCurrentSession: '当前会话',
+    historySwitchTo: '切换到这个会话',
+    historyDeleteTitle: '删除这个会话',
+    historyDeleteAria: '删除 {title}',
+    historyUntitled: '(无标题)',
+    relJustNow: '刚刚',
+    relMinutesAgo: '{n} 分钟前',
+    relHoursAgo: '{n} 小时前',
+    relDaysAgo: '{n} 天前',
+
+    // ChatLayout
+    resizeHandleTitle: '拖拽调整宽度',
   },
   en: {
     // Header
@@ -249,6 +359,116 @@ const translations = {
 
     // Misc
     loading: 'Loading session...',
+
+    // Session / task labels (timeline "Session" bubbles)
+    sessionStarted: 'Session started',
+    taskLabelTriage: 'Classify emails only',
+    taskLabelDaily: 'Process emails needing replies',
+    taskLabelSingle: 'Process a single email',
+
+    // One-shot task summaries emitted on first prioritize result
+    classifyDoneTriage: '📥 Classified {count} emails — triage-only mode drafts no replies; see the left panel for details',
+    singleReplyHit: '🎯 Processing this 1 email — drafting now',
+    singleReplyMiss: '🎯 This email is not in the cache — try "Force Refresh" above',
+    digestHasDrafts: '📥 Received {total} emails, {need} need replies — you will review each draft',
+    digestNoDrafts: '📥 Received {count} emails, none need a drafted reply',
+
+    // HITL review prompt
+    reviewPrompt: 'For manual review: {subject}',
+    draftNoSubjectHint: '(draft has no subject — the LLM usually misses it; the backend falls back to Re:)',
+
+    // Streaming bubble eyebrows
+    streamingSummary: 'Writing digest…',
+    streamingDraft: 'Drafting reply…',
+
+    // Run lifecycle
+    cancelled: 'Cancelled',
+    stopped: '⏹ Stopped',
+    backendError: 'Backend error',
+    checkpointWarning: '⚠ The backend asked to re-review the same email ({id}).\nThis usually means the LangGraph checkpointer did not persist (local dev defaults to in-memory)\nand each request starts from a fresh process.',
+    restoredToReview: '↩ Restored to the paused review — continue with this email',
+    loadSessionFailed: 'Failed to load session: {msg}',
+
+    // Decision echo labels (timeline bubbles for user decisions)
+    decApprove: '✓ Approve',
+    decApproveEdited: '✓ Approve (edited)',
+    decEdit: '✏️ Use my edit',
+    decReject: '✗ No reply',
+    decRegenerate: '↻ Rewrite',
+    decRegenerateWith: '↻ Rewrite: {feedback}',
+    decSkip: '↦ Skip',
+
+    // Runtime status chip (header)
+    chipAwaiting: 'Awaiting Review',
+    chipAwaitingCount: 'Awaiting Review · {i} / {t}',
+    chipRunning: 'Running',
+    chipRunningCount: 'Running · {i} / {t}',
+    chipDone: 'Done',
+    chipDoneCount: 'Done · {i} / {t}',
+
+    // DraftReviewCard
+    noSubjectDraft: '(no subject)',
+    draftToLabel: 'To:',
+    draftToneLabel: 'Tone:',
+    draftRemainingPrefix: ' · ',
+    draftRemainingSuffix: ' more in queue',
+    draftConfidenceTitle: "The model's confidence in this draft",
+
+    // EmailDetailDrawer
+    drawerAriaLabel: 'Email details',
+    drawerCloseTitle: 'Close (Esc)',
+    drawerCopyDraft: 'Copy draft',
+    drawerUnknownSender: '(unknown sender)',
+    drawerMetaTitle: 'Email Info',
+    drawerFrom: 'From',
+    drawerTo: 'To',
+    drawerSubject: 'Subject',
+    drawerTime: 'Time',
+    drawerAttachment: 'Attachment',
+    drawerIcs: 'Calendar invite (.ics)',
+    drawerClassTitle: 'AI Classification',
+    drawerPriority: 'Priority {n}',
+    drawerNeedsReply: 'Needs reply',
+    drawerOriginalTitle: 'Original Email',
+    drawerPlainText: 'Plain text',
+    drawerEmptyBody: '(empty body)',
+    drawerDraftTitle: 'Draft',
+    drawerNoDraft: 'No draft generated yet',
+    drawerCopy: 'Copy',
+    drawerCopyTitle: 'Copy to clipboard',
+    drawerCopied: 'Copied',
+
+    // EmailInboxTree
+    filterToggleTitle: 'Show/hide filters',
+    searchPlaceholder: 'Search subject/sender...',
+    clearSearchTitle: 'Clear search',
+    filterResult: 'Showing {shown} / {total}',
+    refreshBannerTitle: 'A new task is re-fetching and classifying emails; this panel refreshes when done',
+    refreshBannerText: 'Re-fetching...',
+    needsReplyTitle: 'Needs reply',
+    noReplyNeededTitle: 'No reply needed',
+
+    // NodeFlowVisualizer
+    cachedPillTitle: 'Reused the previous result — no real mailbox / LLM access',
+    cachedPillLabel: 'cached',
+    nodeActive: 'Active',
+    nodePaused: 'Paused',
+    nodeDone: 'Done',
+    nodeError: 'Error',
+
+    // HistorySidebar
+    historyCurrentSession: 'Current session',
+    historySwitchTo: 'Switch to this session',
+    historyDeleteTitle: 'Delete this session',
+    historyDeleteAria: 'Delete {title}',
+    historyUntitled: '(untitled)',
+    relJustNow: 'just now',
+    relMinutesAgo: '{n} min ago',
+    relHoursAgo: '{n} h ago',
+    relDaysAgo: '{n} d ago',
+
+    // ChatLayout
+    resizeHandleTitle: 'Drag to resize',
   },
 } as const;
 

@@ -26,7 +26,7 @@ import EmailDetailDrawer from './components/EmailDetailDrawer';
 import EmailInboxTree from './components/EmailInboxTree';
 import HistorySidebar from './components/HistorySidebar';
 import NodeFlowVisualizer from './components/NodeFlowVisualizer';
-import { useI18n } from './i18n';
+import { useI18n, type TranslationKey } from './i18n';
 import {
   getConversation,
   getEmailProvider,
@@ -55,13 +55,13 @@ import type {
 } from './types';
 import { tokens } from './design-tokens';
 
-/** Friendly Chinese label per task — matches the backend's append_message
+/** Friendly label key per task — matches the backend's append_message
  * content prefix so a fresh-run session line and a restored-from-history line
  * read identically in the timeline. */
-const TASK_LABEL: Record<RunTask, string> = {
-  triage_only: '仅分类邮件',
-  daily_digest: '处理待回邮件',
-  single_reply: '单独处理某封邮件',
+const TASK_LABEL_KEY: Record<RunTask, TranslationKey> = {
+  triage_only: 'taskLabelTriage',
+  daily_digest: 'taskLabelDaily',
+  single_reply: 'taskLabelSingle',
 };
 
 const SESSION_ID_KEY = 'email-assistant-conv-id';
@@ -485,6 +485,11 @@ export default function App() {
   const [pending, setPending] = useState<PendingDraft | null>(null);
   const [running, setRunning] = useState(false);
   const [pipeline, dispatchPipeline] = useReducer(pipelineReducer, INITIAL_PIPELINE);
+  // Keep the browser tab title in sync with the UI locale (index.html ships
+  // a neutral English title; zh users get the Chinese one once React mounts).
+  useEffect(() => {
+    document.title = `${t('appTitle')} · ${t('appSubtitle')} | EdgeOne Makers`;
+  }, [t]);
   /** Stable for the lifetime of a "session" — multiple runs (triage_only,
    * single_reply, daily_digest) share this conversation_id so LangGraph's
    * checkpointer can accumulate state via the Annotated[..., add] reducers
@@ -563,14 +568,16 @@ export default function App() {
       if (ev === 'session') {
         // First frame of every stream — only render verbose narration on the
         // very first `run` (skip resumed sessions to keep the timeline clean).
-        // Use the same Chinese label format as backend's append_message so
+        // Use the same label format as backend's append_message so
         // restored timelines and live timelines look identical.
         const payload = (frame.data || {}) as { resumed?: boolean; task?: RunTask };
         if (!payload.resumed) {
-          const label = payload.task ? TASK_LABEL[payload.task] ?? payload.task : null;
+          const label = payload.task
+            ? t(TASK_LABEL_KEY[payload.task] ?? ('taskLabelDaily' as TranslationKey)) || payload.task
+            : null;
           addMessage({
             kind: 'session',
-            text: label ? `[task] ${label}` : '会话已开启',
+            text: label ? `[task] ${label}` : t('sessionStarted'),
           });
         }
         return;
@@ -663,14 +670,14 @@ export default function App() {
             summaryEmittedRef.current = true;
             const text =
               taskRef.current === 'triage_only'
-                ? `📥 已分类 ${totalClassified} 封邮件 — 仅分类模式不会起草回复,左栏可查看分类详情`
+                ? t('classifyDoneTriage', { count: totalClassified })
                 : taskRef.current === 'single_reply'
                 ? needReply > 0
-                  ? `🎯 单独处理这 1 封邮件,即将起草`
-                  : `🎯 这封邮件没在缓存里 — 试试上方「强制刷新」拉一次`
+                  ? t('singleReplyHit')
+                  : t('singleReplyMiss')
                 : needReply > 0
-                ? `📥 收到 ${totalClassified} 封邮件,其中 ${needReply} 封需要起草回复 — 接下来会逐封请你审批`
-                : `📥 收到 ${totalClassified} 封邮件,本批没有需要起草回复的`;
+                ? t('digestHasDrafts', { total: totalClassified, need: needReply })
+                : t('digestNoDrafts', { count: totalClassified });
             addMessage({ kind: 'system', text });
           }
         }
@@ -711,17 +718,16 @@ export default function App() {
           checkpointWarningShownRef.current = true;
           addMessage({
             kind: 'error',
-            text:
-              `⚠ 后端要求重审同一封邮件(${payload.email_id})。\n` +
-              '通常意味着 LangGraph checkpointer 没持久化(本地 dev 默认 in-memory),\n' +
-              '每次请求新进程就丢了之前的状态。'
+            text: t('checkpointWarning', { id: payload.email_id }),
           });
         }
         setPending({ draft: payload.draft, remaining: payload.remaining ?? 0 });
         dispatchPipeline({ type: 'paused', emailId: payload.email_id });
         addMessage({
           kind: 'review',
-          text: `请人工审核:${payload.draft.subject || '(草稿没标题 — 通常是 LLM 没填好,后端会兜底加 Re:)'}`,
+          text: t('reviewPrompt', {
+            subject: payload.draft.subject || t('draftNoSubjectHint'),
+          }),
         });
         return;
       }
@@ -739,13 +745,13 @@ export default function App() {
       if (ev === 'error_message' && typeof frame.data === 'object' && frame.data) {
         const payload = frame.data as { error: string };
         dispatchPipeline({ type: 'error' });
-        addMessage({ kind: 'error', text: payload.error || '后端报错' });
+        addMessage({ kind: 'error', text: payload.error || t('backendError') });
         setProgress(null);
         setStreamingText(null);
         return;
       }
       if (ev === 'cancelled') {
-        addMessage({ kind: 'system', text: '已取消' });
+        addMessage({ kind: 'system', text: t('cancelled') });
         setProgress(null);
         setStreamingText(null);
         return;
@@ -753,7 +759,7 @@ export default function App() {
       // [PAUSED] / [DONE] / [CANCELLED] sentinels arrive as raw strings —
       // we already handled the meaningful events above, so just ignore.
     },
-    [addMessage],
+    [addMessage, t],
   );
 
   const startRun = useCallback(
@@ -784,7 +790,7 @@ export default function App() {
       // semantics: the FIRST task on this cid wins as the title — re-running
       // a different task on the same cid only bumps updatedAt to float the
       // row to the top. Mirrors backend ``_maybe_set_title_first_run``.
-      saveLocalConversation(cid, `[task] ${TASK_LABEL[task]}`, task);
+      saveLocalConversation(cid, `[task] ${t(TASK_LABEL_KEY[task])}`, task);
       // Don't clear messages — timeline accumulates across runs in the same
       // session. The user clicked "新会话" if they wanted a clean slate.
       setPending(null);
@@ -828,6 +834,7 @@ export default function App() {
         for await (const frame of runEmailAssistant({
           task,
           conversationId: cid,
+          locale,
           preloadedClassified: cached as unknown[] | undefined,
           targetEmailId: opts?.targetEmailId,
           skipEmailIds: skipIds,
@@ -856,6 +863,8 @@ export default function App() {
     [
       addMessage,
       handleFrame,
+      locale,
+      t,
       pipeline.classified,
       pipeline.doneEmailIds,
     ],
@@ -894,11 +903,11 @@ export default function App() {
     // Reset pipeline visuals: active/paused nodes revert to pending,
     // active email highlight in the left column clears.
     dispatchPipeline({ type: 'stop' });
-    addMessage({ kind: 'system', text: '⏹ 已停止' });
+    addMessage({ kind: 'system', text: t('stopped') });
     setRunning(false);
     setProgress(null);
     setStreamingText(null);
-  }, [addMessage]);
+  }, [addMessage, t]);
 
   /** Generate a fresh conversation_id and reset all state. The previous
    * conversation is preserved in the platform's store and remains visible
@@ -984,7 +993,7 @@ export default function App() {
           if (!opts?.silent) {
             addMessage({
               kind: 'error',
-              text: '此会话已在其他设备删除',
+              text: t('historyDeletedRemote'),
             });
           }
           // Inline the equivalent of startNewSession (we're already mid-
@@ -1023,7 +1032,7 @@ export default function App() {
           detail.messages.length > 0 &&
           !getLocalConversations().some((c) => c.id === id)
         ) {
-          const title = deriveTitleFromMessages(detail.messages) || '未命名会话';
+          const title = deriveTitleFromMessages(detail.messages) || t('historyUntitled');
           saveLocalConversation(id, title);
           setHistoryRefreshKey((k) => k + 1);
         }
@@ -1127,7 +1136,7 @@ export default function App() {
             if (!opts?.silent) {
               addMessage({
                 kind: 'system',
-                text: '↩ 已恢复到上次中断的审批位置 — 继续处理这封邮件',
+                text: t('restoredToReview'),
               });
             }
             // Mirror to the sync ref so handleFrame's duplicate detector
@@ -1156,7 +1165,7 @@ export default function App() {
         if (!opts?.silent) {
           addMessage({
             kind: 'error',
-            text: `加载会话失败: ${(e as Error).message}`,
+            text: t('loadSessionFailed', { msg: (e as Error).message }),
           });
         }
         // Failed restore: clear left column too, otherwise the prior
@@ -1173,7 +1182,7 @@ export default function App() {
         setRestoring(false);
       }
     },
-    [running, restoring, addMessage],
+    [running, restoring, addMessage, t],
   );
 
   // Mount: pick / generate the session id, persist to URL + localStorage,
@@ -1220,7 +1229,7 @@ export default function App() {
       const cid = conversationIdRef.current;
       if (!cid || !pending) return;
       // Echo the decision into the timeline immediately
-      addMessage({ kind: 'decision', text: decisionLabel(decision) });
+      addMessage({ kind: 'decision', text: decisionLabel(decision, t) });
       // 'regenerate' keeps the same email active — don't add it to doneEmailIds.
       // Other actions (approve / edit / reject / skip) finalize this email.
       if (decision.action === 'regenerate') {
@@ -1240,7 +1249,7 @@ export default function App() {
       try {
         const controller = new AbortController();
         abortControllerRef.current = controller;
-        for await (const frame of submitReview({ conversationId: cid, decision, signal: controller.signal })) {
+        for await (const frame of submitReview({ conversationId: cid, decision, locale, signal: controller.signal })) {
           handleFrame(frame);
         }
       } catch (e) {
@@ -1252,7 +1261,7 @@ export default function App() {
         setRunning(false);
       }
     },
-    [addMessage, handleFrame, pending],
+    [addMessage, handleFrame, locale, t, pending],
   );
 
   const nodeStatusesForViz = useMemo(
@@ -1485,18 +1494,18 @@ export default function App() {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function decisionLabel(d: ReviewDecisionInput): string {
+function decisionLabel(d: ReviewDecisionInput, t: (key: TranslationKey, vars?: Record<string, string | number>) => string): string {
   switch (d.action) {
     case 'approve':
-      return '✓ 通过';
+      return t('decApprove');
     case 'edit':
-      return d.edited_body ? '✏️ 用我改的版本' : '✓ 通过(编辑)';
+      return d.edited_body ? t('decEdit') : t('decApproveEdited');
     case 'reject':
-      return '✗ 不回复';
+      return t('decReject');
     case 'regenerate':
-      return d.feedback ? `↻ 重写:${d.feedback}` : '↻ 重写';
+      return d.feedback ? t('decRegenerateWith', { feedback: d.feedback }) : t('decRegenerate');
     case 'skip':
-      return '↦ 跳过';
+      return t('decSkip');
   }
 }
 
@@ -1815,6 +1824,7 @@ function RuntimeStatusChip({
   total,
   showCounter,
 }: StatusChipProps) {
+  const { t } = useI18n();
   // Idle: hide entirely so the header stays clean before the user clicks anything.
   if (!running && messagesCount === 0) return null;
 
@@ -1825,15 +1835,15 @@ function RuntimeStatusChip({
   if (paused) {
     tone = 'warning';
     icon = <Icon name="pause" size={12} />;
-    label = showCounter ? `等待审批 · ${iteration} / ${total}` : '等待审批';
+    label = showCounter ? t('chipAwaitingCount', { i: iteration, t: total }) : t('chipAwaiting');
   } else if (running) {
     tone = 'brand';
     icon = <IconSpinner size={12} />;
-    label = showCounter ? `运行中 · ${iteration} / ${total}` : '运行中';
+    label = showCounter ? t('chipRunningCount', { i: iteration, t: total }) : t('chipRunning');
   } else {
     tone = 'success';
     icon = <Icon name="check-circle" size={12} />;
-    label = showCounter ? `已完成 · ${iteration} / ${total}` : '已完成';
+    label = showCounter ? t('chipDoneCount', { i: iteration, t: total }) : t('chipDone');
   }
 
   const palette = {

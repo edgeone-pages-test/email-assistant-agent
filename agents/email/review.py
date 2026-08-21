@@ -34,6 +34,7 @@ if str(CURRENT) not in sys.path:
 from langgraph.types import Command  # noqa: E402
 
 from _graph import get_graph  # noqa: E402
+from _i18n import normalize_locale, tr  # noqa: E402
 from _llm import DEFAULT_MODEL, get_crewai_llm, get_env, get_openai_client  # noqa: E402
 from _providers import get_provider  # noqa: E402
 from _sse_utils import to_jsonable  # noqa: E402
@@ -43,13 +44,14 @@ from run import _utils_or_fallback, draft_preview, save_message  # noqa: E402
 VALID_ACTIONS = {"approve", "edit", "reject", "regenerate", "skip"}
 
 
-# Friendly Chinese label for the user-message stored in chat history.
-_DECISION_LABEL = {
-    "approve": "✓ 通过",
-    "edit": "✏️ 用我改的版本",
-    "reject": "✗ 不回复",
-    "regenerate": "↻ 重写",
-    "skip": "↦ 跳过",
+# Decision id → i18n key for the friendly label of the user-message stored
+# in chat history.
+_DECISION_LABEL_KEY = {
+    "approve": "review_approve",
+    "edit": "review_edit",
+    "reject": "review_reject",
+    "regenerate": "review_regenerate",
+    "skip": "review_skip",
 }
 
 
@@ -87,6 +89,10 @@ async def handler(context):
         # Validation error
         return validated
     action, edited_body, feedback = validated
+    # UI locale for the history labels / draft previews written below. The
+    # LangGraph state itself keeps the locale from the original run.py call
+    # (checkpointed), so resumed nodes narrate in the same language.
+    locale = normalize_locale(body.get("locale"))
 
     # Bootstrap the same dependencies run.py uses — graph topology MUST match
     # because we're resuming from the checkpoint produced by run.py.
@@ -133,13 +139,14 @@ async def handler(context):
         # Persist the user's decision into chat history before we kick off
         # the resume — this way even if the resume errors out, the history
         # tab still shows what the user picked.
-        decision_text = _DECISION_LABEL.get(action, action)
+        decision_key = _DECISION_LABEL_KEY.get(action)
+        decision_text = tr(locale, decision_key) if decision_key else action
         if feedback:
             decision_text = f"{decision_text}: {feedback}"
         elif edited_body:
             # Hint that there's a custom body without dumping the whole
             # email into the chat label (which would be noisy in the sidebar).
-            decision_text = f"{decision_text} (改了正文)"
+            decision_text = f"{decision_text} {tr(locale, 'review_edited_body')}"
         await save_message(
             context,
             role="user",
@@ -194,7 +201,7 @@ async def handler(context):
                             await save_message(
                                 context,
                                 role="assistant",
-                                content=draft_preview(draft),
+                                content=draft_preview(draft, locale),
                                 metadata={
                                     "kind": "draft_for_review",
                                     "email_id": draft.get("email_id"),

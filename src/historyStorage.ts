@@ -106,10 +106,11 @@ export function saveLocalConversation(
     _writeRaw(list);
     return;
   }
-  // Insert new row.
+  // Insert new row. Neutral fallback title — HistorySidebar localizes its
+  // own "(untitled)" via i18n when the stored title is empty after trimming.
   list.unshift({
     id,
-    title: title || '(无标题)',
+    title: title || '(untitled)',
     task,
     createdAt: now,
     updatedAt: now,
@@ -154,7 +155,7 @@ export function mergeFromServer(items: ConversationListItem[]): void {
     if (!it || !it.id || localIds.has(it.id)) continue;
     additions.push({
       id: it.id,
-      title: it.title || '(无标题)',
+      title: it.title || '(untitled)',
       // task unknown — server's ConversationListItem doesn't carry it
       createdAt: it.createdAt || it.lastMessageAt || Date.now(),
       updatedAt: it.lastMessageAt || it.createdAt || Date.now(),

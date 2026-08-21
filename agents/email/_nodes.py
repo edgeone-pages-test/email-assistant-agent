@@ -24,6 +24,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from _i18n import LANGUAGE_NAME, tr
 from _models import (
     Action,
     ClassifiedEmail,
@@ -128,6 +129,7 @@ async def fetch(
     ``summarize``) still get a correct value.
     """
     write = _writer()
+    locale = state.get("locale", "zh")
     pre = state.get("classified") or []
     if pre:
         # ``_cached`` is a transient signal for the SSE stream — the frontend
@@ -137,11 +139,11 @@ async def fetch(
         write({
             "phase": "fetch",
             "stage": "skipped",
-            "message": f"⚡ 复用缓存的 {len(pre)} 封邮件 (跳过抓取)",
+            "message": tr(locale, "fetch_cached", n=len(pre)),
         })
         return {"inbox": [c.email for c in pre], "_cached": True}
 
-    write({"phase": "fetch", "stage": "started", "message": "📥 正在从邮箱拉取最新邮件…"})
+    write({"phase": "fetch", "stage": "started", "message": tr(locale, "fetch_started")})
 
     rules = _bundle_from_rules(state.get("user_rules") or [])
     since = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
@@ -164,8 +166,8 @@ async def fetch(
         "phase": "fetch",
         "stage": "completed",
         "message": (
-            f"📥 拉取完成 · {len(kept)} 封待分类"
-            + (f" · 自动归档 {archived} 封" if archived else "")
+            tr(locale, "fetch_done", n=len(kept))
+            + (tr(locale, "fetch_archived", n=archived) if archived else "")
         ),
     })
     return {"inbox": kept}
@@ -262,6 +264,7 @@ async def classify(
     fetch+classify pair is ~15-20s and ~10 LLM calls otherwise.
     """
     write = _writer()
+    locale = state.get("locale", "zh")
 
     if state.get("classified"):
         # Same ``_cached`` flag as fetch — gives the frontend something to
@@ -270,7 +273,7 @@ async def classify(
         write({
             "phase": "classify",
             "stage": "skipped",
-            "message": "⚡ 复用缓存的分类结果 (跳过 LLM)",
+            "message": tr(locale, "classify_cached"),
         })
         return {"_cached": True}
 
@@ -281,7 +284,7 @@ async def classify(
     write({
         "phase": "classify",
         "stage": "started",
-        "message": f"🧠 LLM 正在分类 {len(inbox)} 封邮件… (单次批量调用)",
+        "message": tr(locale, "classify_started", n=len(inbox)),
     })
 
     # Lazy import: keeps the rest of _nodes.py importable without skills/
@@ -309,7 +312,7 @@ async def classify(
         write({
             "phase": "classify",
             "stage": "error",
-            "message": f"❌ 分类失败:{exc}",
+            "message": tr(locale, "classify_failed", err=exc),
         })
         return {"errors": [f"classify: LLM call failed: {exc}"]}
 
@@ -320,7 +323,7 @@ async def classify(
         write({
             "phase": "classify",
             "stage": "error",
-            "message": "❌ 分类输出无法解析",
+            "message": tr(locale, "classify_unparsed"),
         })
         return {"errors": [f"classify: failed to parse LLM output: {text[:200]}"]}
 
@@ -341,7 +344,7 @@ async def classify(
     write({
         "phase": "classify",
         "stage": "completed",
-        "message": f"✅ 分类完成 · {len(classified)} 封已贴标签",
+        "message": tr(locale, "classify_done", n=len(classified)),
     })
     return {"classified": classified}
 
@@ -374,7 +377,7 @@ async def prioritize(
     write({
         "phase": "prioritize",
         "stage": "started",
-        "message": "📊 应用规则与排序…",
+        "message": tr(state.get("locale", "zh"), "prioritize_started"),
     })
 
     task = state.get("task")
@@ -421,9 +424,10 @@ async def prioritize(
             # Help the user diagnose: no draft will be produced because the
             # email isn't in the (possibly cached) classified set. Surface a
             # concrete next step rather than silently routing to summarize.
-            reason = (
-                f"指定的邮件 {target_id or '(空 id)'} 不在当前收件箱里"
-                " — 缓存可能过期,试试上方「强制刷新」"
+            reason = tr(
+                state.get("locale", "zh"),
+                "prioritize_target_missing",
+                id=target_id or "(no id)",
             )
             return {"prioritized": [], "cursor": 0, "errors": [reason]}
         return {"prioritized": [target], "cursor": 0}
@@ -435,9 +439,9 @@ async def prioritize(
         "phase": "prioritize",
         "stage": "completed",
         "message": (
-            f"📊 排序完成 · 待处理 {len(keep)} 封"
+            tr(state.get("locale", "zh"), "prioritize_done", n=len(keep))
             if keep
-            else "📊 排序完成 · 没有需要回复的"
+            else tr(state.get("locale", "zh"), "prioritize_empty")
         ),
     })
 
@@ -469,6 +473,7 @@ async def draft_with_crew(state: EmailAssistantState, *, llm) -> dict:
     润色员在调整语气" narration as each agent runs.
     """
     write = _writer()
+    locale = state.get("locale", "zh")
     prioritized = state.get("prioritized") or []
     cursor = state.get("cursor", 0)
     if cursor >= len(prioritized):
@@ -495,8 +500,8 @@ async def draft_with_crew(state: EmailAssistantState, *, llm) -> dict:
     if len(subject_short) > 40:
         subject_short = subject_short[:40] + "…"
     intro = (
-        f"🤖 三人小组开始为「{subject_short or '(无主题)'}」起草回复"
-        + (" · 应用了你的修改建议" if regenerate_feedback else "")
+        tr(locale, "draft_started", subject=subject_short or tr(locale, "no_subject"))
+        + (tr(locale, "draft_started_feedback") if regenerate_feedback else "")
     )
     write({
         "phase": "draft",
@@ -522,7 +527,7 @@ async def draft_with_crew(state: EmailAssistantState, *, llm) -> dict:
         # Bridge CrewAI bus → custom stream for the duration of kickoff.
         # The bridge schedules writer calls via call_soon_threadsafe, so
         # CrewAI's worker thread can publish events safely.
-        with CrewProgressBridge(loop, write, email_subject=ce.email.subject):
+        with CrewProgressBridge(loop, write, email_subject=ce.email.subject, locale=locale):
             # YAML variables are filled by CrewAI at kickoff via inputs dict
             out = await asyncio.to_thread(crew.kickoff, inputs=inputs)
     except Exception as exc:
@@ -530,7 +535,7 @@ async def draft_with_crew(state: EmailAssistantState, *, llm) -> dict:
             "phase": "draft",
             "stage": "error",
             "email_id": ce.email.id,
-            "message": f"❌ Crew 报错:{exc}",
+            "message": tr(locale, "draft_error", err=exc),
         })
         # Surface the error and emit a placeholder draft so HITL can show the
         # user what went wrong (rather than spinning silently).
@@ -543,12 +548,12 @@ async def draft_with_crew(state: EmailAssistantState, *, llm) -> dict:
         }
 
     draft = _coerce_draft_output(out, ce, rules)
-    draft = _normalize_draft(draft, ce)
+    draft = _normalize_draft(draft, ce, locale=locale)
     write({
         "phase": "draft",
         "stage": "completed",
         "email_id": ce.email.id,
-        "message": f"✅ 草稿就绪 · {len(draft.body)} 字 · 等你审批",
+        "message": tr(locale, "draft_done", n=len(draft.body)),
     })
     return {"drafts": [draft], "pending_review": draft}
 
@@ -584,6 +589,12 @@ def _strip_email_markdown(body: str) -> str:
     if not body:
         return body
     text = body
+
+    # 0. Tool-result leak — the writer agent sometimes prepends the JSON it
+    # got from ``lookup_reply_template`` (e.g. ``{"template_name": "..."}``)
+    # to the draft body. Strip that leading fragment so the user only sees
+    # the actual prose.
+    text = re.sub(r"^\s*\{\s*\"template_name\"\s*:[^{}]*\}\s*", "", text)
 
     # 1. Code fences — keep inner content, drop the fence markers + lang hint
     text = re.sub(r"```[^\n]*\n?(.*?)```", r"\1", text, flags=re.DOTALL)
@@ -646,7 +657,7 @@ def _strip_email_markdown(body: str) -> str:
     return cleaned.strip()
 
 
-def _normalize_draft(draft: DraftItem, ce: ClassifiedEmail) -> DraftItem:
+def _normalize_draft(draft: DraftItem, ce: ClassifiedEmail, *, locale: str = "zh") -> DraftItem:
     """Apply post-LLM safety nets so the UI never shows broken drafts.
 
     The polisher LLM occasionally returns:
@@ -667,7 +678,7 @@ def _normalize_draft(draft: DraftItem, ce: ClassifiedEmail) -> DraftItem:
     has_placeholder_subject = "{" in raw_subject and "}" in raw_subject
     if bare_re or has_placeholder_subject:
         original = (ce.email.subject or "").strip()
-        patched["subject"] = f"Re: {original}" if original else "Re: (无主题)"
+        patched["subject"] = f"Re: {original}" if original else f"Re: {tr(locale, 'no_subject')}"
 
     # body: keep whatever non-empty content we have, but reject obvious
     # placeholder leaks (the LLM complaining about missing inputs).
@@ -680,10 +691,7 @@ def _normalize_draft(draft: DraftItem, ce: ClassifiedEmail) -> DraftItem:
         or "请把原始邮件" in body_text
     )
     if (not body_text) or looks_like_placeholder_complaint:
-        patched["body"] = (
-            "(草稿生成失败 — LLM 没拿到有效的邮件上下文。请点 ↻ 重写,或检查 "
-            "_tasks.py / _crew.py 的 inputs 传递是否完整。)"
-        )
+        patched["body"] = tr(locale, "placeholder_body")
     else:
         # Strip residual markdown — emails are plain text. Prompts are
         # advisory; this pass is the enforcement. Always run, even if the
@@ -922,26 +930,28 @@ async def apply(state: EmailAssistantState, *, provider) -> dict:
 # ─── summarize (final markdown digest) ───────────────────────────────────────
 
 
-SUMMARIZE_SYSTEM = """你是一个邮件助手的总结员。生成一份简洁的中文摘要(≤800 字符),
-让用户一眼看清这次跑完的成果。
+SUMMARIZE_SYSTEM = """You are the summarizer of an email assistant. Produce a concise digest
+(≤800 characters) that lets the user see at a glance what this run achieved.
 
-结构(用 markdown 二级标题分节,内容用纯文本或无序列表):
+Structure (markdown level-2 headings, plain text or bullet lists for content):
 
-1. ## 概览 —— 用一两句自然语言写清楚:邮件总数 / 已分类 / 已起草 / 决策数
-2. ## 需要关注的 —— 列出前 5 封 priority 高的邮件,每封一行无序列表项,格式:
-   `- [优先级] 主题 — 发件人 — 一句理由`
-3. ## 本次决定 —— 用无序列表展示每封的 action(approve/edit/reject/skip),
-   每行格式:`- 主题(发件人):approve/edit/reject/skip — 一句简评`
-4. ## 下一步建议 —— 1-3 条自然语言提示
+1. ## Overview —— one or two natural-language sentences: total emails /
+   classified / drafted / decisions
+2. ## Needs Attention —— the top 5 emails by priority, one bullet per line,
+   formatted as: `- [priority] subject — sender — one-line reason`
+3. ## Decisions —— a bullet list of each email's action
+   (approve/edit/reject/skip), one per line:
+   `- subject (sender): approve/edit/reject/skip — one-line comment`
+4. ## Next Steps —— 1-3 natural-language suggestions
 
-严格要求:
-- ❌ 禁止使用 markdown 表格(任何形如 `| 列1 | 列2 |` 的语法都不行 —— 前端不支持渲染)
-- ❌ 禁止使用 markdown 代码块 / 围栏(```...```)
-- ❌ 禁止使用 HTML 标签
-- ✅ 只允许:## 标题、`- ` 无序列表、**加粗**、普通段落
-- 简洁,商务感
-- 不要重复每封邮件的全文
-- 直接输出 markdown 内容,无前后语
+Strict requirements:
+- ❌ NO markdown tables (any `| col | col |` syntax — the frontend cannot render them)
+- ❌ NO fenced code blocks (```...```)
+- ❌ NO HTML tags
+- ✅ Only: ## headings, `- ` bullet lists, **bold**, plain paragraphs
+- Concise, business-friendly
+- Do not repeat the full text of each email
+- Output the markdown directly, no preamble or closing remarks
 """
 
 
@@ -1033,22 +1043,29 @@ async def summarize(
     if state.get("task") == "single_reply":
         return {"summary": ""}
 
+    locale = state.get("locale", "zh")
     payload = _summary_payload(state)
-    fallback = _fallback_summary(payload)
+    fallback = _fallback_summary(payload, locale=locale)
 
     write({
         "phase": "summarize",
         "stage": "started",
-        "message": f"📝 LLM 正在生成日报… (基于 {payload['counts']['decisions']} 条决策)",
+        "message": tr(locale, "summarize_started", n=payload["counts"]["decisions"]),
     })
 
     # Lazy import — keeps tests that exercise summarize without skills lean
     from _skill_loader import render_skill_for_prompt
 
     tone_skill = render_skill_for_prompt("email-tone", max_chars=2000)
-    system_prompt = SUMMARIZE_SYSTEM
+    # The prompt skeleton is English; the OUTPUT language is injected per the
+    # UI locale so an English user gets an English digest and a Chinese user
+    # gets a Chinese one.
+    system_prompt = (
+        SUMMARIZE_SYSTEM
+        + f"\nWrite the ENTIRE summary (headings included) in {LANGUAGE_NAME[locale]}.\n"
+    )
     if "not installed" not in tone_skill:
-        system_prompt = f"{SUMMARIZE_SYSTEM}\n\n{tone_skill}"
+        system_prompt = f"{system_prompt}\n{tone_skill}"
 
     # Token streaming — emit each non-empty delta to the custom-stream channel
     # so the frontend can render the markdown summary as it's generated. The
@@ -1088,7 +1105,7 @@ async def summarize(
         write({
             "phase": "summarize",
             "stage": "error",
-            "message": f"⚠ 摘要生成失败,使用降级模板:{exc}",
+            "message": tr(locale, "summarize_failed", err=exc),
         })
         return {"summary": fallback, "errors": [f"summarize: LLM call failed: {exc}"]}
 
@@ -1097,7 +1114,7 @@ async def summarize(
         write({
             "phase": "summarize",
             "stage": "error",
-            "message": "⚠ LLM 返回空摘要,使用降级模板",
+            "message": tr(locale, "summarize_empty"),
         })
         return {"summary": fallback, "errors": ["summarize: LLM returned empty"]}
     # Sanitize markdown the frontend can't render (tables, code fences,
@@ -1110,7 +1127,7 @@ async def summarize(
     write({
         "phase": "summarize",
         "stage": "completed",
-        "message": f"✅ 日报生成完成 · {len(text)} 字",
+        "message": tr(locale, "summarize_done", n=len(text)),
     })
     return {"summary": text}
 
@@ -1146,26 +1163,26 @@ def _summary_payload(state: EmailAssistantState) -> dict:
     }
 
 
-def _fallback_summary(payload: dict) -> str:
+def _fallback_summary(payload: dict, *, locale: str = "zh") -> str:
     c = payload["counts"]
     if c["inbox"] == 0:
-        return "## 概览\n\n今日无新邮件。"
+        return tr(locale, "fb_no_mail")
     lines = [
-        "## 概览",
-        f"- 收件箱总数:{c['inbox']}",
-        f"- 已分类:{c['classified']} 封",
-        f"- 已生成草稿:{c['drafts']} 封",
-        f"- 决策数:{c['decisions']}",
-        f"- 已执行动作:{c['actions']}",
+        tr(locale, "fb_overview"),
+        tr(locale, "fb_inbox_total", n=c["inbox"]),
+        tr(locale, "fb_classified", n=c["classified"]),
+        tr(locale, "fb_drafted", n=c["drafts"]),
+        tr(locale, "fb_decisions", n=c["decisions"]),
+        tr(locale, "fb_actions", n=c["actions"]),
     ]
     if payload["top"]:
         lines.append("")
-        lines.append("## 需要关注的")
+        lines.append(tr(locale, "fb_attention"))
         for t in payload["top"]:
             lines.append(f"- [{t['priority']}] {t['subject']} — {t['from']}")
     if payload["decisions"]:
         lines.append("")
-        lines.append("## 本次决定")
+        lines.append(tr(locale, "fb_decided"))
         for d in payload["decisions"]:
             lines.append(f"- {d['email_id']}: **{d['action']}**")
     return "\n".join(lines)

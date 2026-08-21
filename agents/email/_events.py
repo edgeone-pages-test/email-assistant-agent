@@ -31,25 +31,27 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Callable
 
+from _i18n import tr
 
-# CrewAI's canonical role strings → friendly Chinese label + emoji shown in
-# the live-progress chip on the frontend. Falls back to the raw role name
-# when an unknown agent reports in (so adding a fourth role doesn't break
-# the bridge — it just shows the english name).
-_AGENT_LABEL: dict[str, str] = {
-    "Email Triage Analyst": "🔍 分析师在读邮件",
-    "Reply Writer": "✍️ 撰稿员在起草",
-    "Voice Polisher": "🎨 润色员在调整语气",
+
+# CrewAI's canonical role strings → i18n key for the friendly label + emoji
+# shown in the live-progress chip on the frontend. Falls back to the raw role
+# name when an unknown agent reports in (so adding a fourth role doesn't break
+# the bridge — it just shows the English name).
+_AGENT_LABEL_KEY: dict[str, str] = {
+    "Email Triage Analyst": "agent_analyst",
+    "Reply Writer": "agent_writer",
+    "Voice Polisher": "agent_polisher",
 }
 
 
-# Map CrewAI Task.name (set in _tasks.py) → Chinese phase label. Used for
-# TaskStartedEvent / TaskCompletedEvent narrations. Must mirror the names
-# in _tasks.py — keep both in sync if you rename a task.
-_TASK_LABEL: dict[str, str] = {
-    "analyze_task": "分析邮件意图",
-    "draft_task": "草拟回复正文",
-    "polish_task": "应用语气与签名",
+# Map CrewAI Task.name (set in _tasks.py) → i18n key for the phase label.
+# Used for TaskStartedEvent / TaskCompletedEvent narrations. Must mirror the
+# names in _tasks.py — keep both in sync if you rename a task.
+_TASK_LABEL_KEY: dict[str, str] = {
+    "analyze_task": "task_analyze",
+    "draft_task": "task_draft",
+    "polish_task": "task_polish",
 }
 
 
@@ -97,10 +99,12 @@ class CrewProgressBridge:
         writer: Callable[[dict], None],
         *,
         email_subject: str = "",
+        locale: str = "zh",
     ) -> None:
         self._loop = loop
         self._writer = writer
         self._subject = (email_subject or "").strip()
+        self._locale = locale
         # Hold strong references to the registered handlers so CrewAI's bus
         # doesn't garbage-collect them mid-run (the bus uses weak refs in
         # some versions — a stale local would silently stop firing).
@@ -192,7 +196,8 @@ class CrewProgressBridge:
         @crewai_event_bus.on(AgentExecutionStartedEvent)
         def _on_agent_start(source, event):  # noqa: ARG001 — CrewAI calls (source, event)
             role = _agent_role(source, event)
-            label = _AGENT_LABEL.get(role, role)
+            key = _AGENT_LABEL_KEY.get(role)
+            label = tr(self._locale, key) if key else role
             self._emit({
                 "phase": "draft",
                 "stage": "agent_start",
@@ -208,18 +213,20 @@ class CrewProgressBridge:
             # event so the very first token chunk (which can race the
             # progress event by a few ms) is correctly attributed.
             self._current_task = tname
-            label = _TASK_LABEL.get(tname, tname or "(任务)")
+            key = _TASK_LABEL_KEY.get(tname)
+            label = tr(self._locale, key) if key else (tname or tr(self._locale, "task_fallback"))
             self._emit({
                 "phase": "draft",
                 "stage": "task_start",
                 "task": tname,
-                "message": f"步骤:{label}",
+                "message": tr(self._locale, "step_prefix", label=label),
             })
 
         @crewai_event_bus.on(TaskCompletedEvent)
         def _on_task_complete(source, event):  # noqa: ARG001
             tname = _task_name(source, event)
-            label = _TASK_LABEL.get(tname, tname or "(任务)")
+            key = _TASK_LABEL_KEY.get(tname)
+            label = tr(self._locale, key) if key else (tname or tr(self._locale, "task_fallback"))
             # Clear the active-task marker so any stray late-arriving chunks
             # from this task don't get emitted (we already showed the user
             # the full output via the token stream).
@@ -229,7 +236,7 @@ class CrewProgressBridge:
                 "phase": "draft",
                 "stage": "task_complete",
                 "task": tname,
-                "message": f"完成:{label}",
+                "message": tr(self._locale, "complete_prefix", label=label),
             })
 
         @crewai_event_bus.on(LLMStreamChunkEvent)

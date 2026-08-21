@@ -34,13 +34,15 @@ export default function DraftReviewCard({ draft, remaining, onSubmit, disabled }
     <div style={shell}>
       <header style={headerRow}>
         <div style={titleStack}>
-          <span style={subjectLine}>{draft.subject || '(无主题)'}</span>
+          <span style={subjectLine}>{draft.subject || t('noSubjectDraft')}</span>
           <span style={metaLine}>
-            收件人:{draft.to.join(', ')} · 语气:<TonePill tone={draft.tone} />
+            {t('draftToLabel')} {draft.to.join(', ')} · {t('draftToneLabel')} <TonePill tone={draft.tone} />
             {remaining > 0 && (
               <>
                 {' '}
-                · 还有 <strong style={{ color: tokens.color.warning }}>{remaining}</strong> 封排队
+                {t('draftRemainingPrefix')}
+                <strong style={{ color: tokens.color.warning }}>{remaining}</strong>
+                {t('draftRemainingSuffix')}
               </>
             )}
           </span>
@@ -147,11 +149,12 @@ function TonePill({ tone }: { tone: string }) {
 }
 
 function ConfidencePill({ conf }: { conf: number }) {
+  const { t } = useI18n();
   const pct = Math.round(conf * 100);
   const color = pct >= 80 ? tokens.color.success : pct >= 50 ? tokens.color.warning : tokens.color.textSubtle;
   return (
     <span
-      title={`模型对此草稿的置信度`}
+      title={t('draftConfidenceTitle')}
       style={{
         fontFamily: tokens.font.mono,
         fontSize: tokens.fontSize.xs,

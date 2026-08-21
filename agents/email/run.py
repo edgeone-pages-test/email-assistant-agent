@@ -23,6 +23,7 @@ if str(CURRENT) not in sys.path:
     sys.path.insert(0, str(CURRENT))
 
 from _graph import get_graph  # noqa: E402
+from _i18n import LANGUAGE_NAME, normalize_locale, tr  # noqa: E402
 from _llm import DEFAULT_MODEL, get_crewai_llm, get_env, get_openai_client  # noqa: E402
 from _providers import get_provider  # noqa: E402
 from _sse_utils import to_jsonable  # noqa: E402
@@ -37,9 +38,9 @@ from _sse_utils import to_jsonable  # noqa: E402
 
 
 _TASK_LABEL = {
-    "triage_only": "仅分类邮件",
-    "daily_digest": "处理待回邮件",
-    "single_reply": "单独处理某封邮件",
+    "triage_only": "task_triage_only",
+    "daily_digest": "task_daily_digest",
+    "single_reply": "task_single_reply",
 }
 
 
@@ -67,9 +68,9 @@ async def save_message(context, role: str, content: str, metadata: dict | None =
         pass
 
 
-def task_label(task: str) -> str:
-    """Friendly Chinese label for a task id (used as the conversation title)."""
-    return _TASK_LABEL.get(task, task)
+def task_label(task: str, locale: str = "zh") -> str:
+    """Friendly label for a task id (used as the conversation title)."""
+    return tr(locale, _TASK_LABEL.get(task, task))
 
 
 async def _maybe_set_title_first_run(context, cid: str, title: str) -> None:
@@ -110,17 +111,17 @@ async def _maybe_set_title_first_run(context, cid: str, title: str) -> None:
         pass
 
 
-def draft_preview(draft_payload: dict) -> str:
+def draft_preview(draft_payload: dict, locale: str = "zh") -> str:
     """Format a HITL draft as a multi-line preview suitable for chat history.
 
     The full draft body can be hundreds of chars; we cap at ~600 to keep the
     history tab snappy and the title-derivation in ``history.py`` cheap.
     """
-    subject = draft_payload.get("subject") or "(无主题)"
+    subject = draft_payload.get("subject") or tr(locale, "no_subject")
     body = (draft_payload.get("body") or "").strip()
     if len(body) > 600:
         body = body[:600] + "…"
-    return f"📨 请审批: {subject}\n\n{body}"
+    return tr(locale, "draft_preview_prefix", subject=subject) + f"\n\n{body}"
 
 
 def _utils_or_fallback(context):
@@ -151,6 +152,7 @@ async def handler(context):
 
     task = body.get("task") or "daily_digest"
     auto_approve = bool(body.get("auto_approve"))
+    locale = normalize_locale(body.get("locale"))
 
     try:
         env = get_env(getattr(context, "env", None))
@@ -164,6 +166,11 @@ async def handler(context):
         rules_bundle = await provider.load_user_rules()
     except Exception as exc:
         return {"status_code": 500, "body": {"error": f"provider init failed: {exc}"}}
+
+    # The UI locale wins over the fixture / KV-stored language rule so that
+    # reply drafts and the final digest always match what the user is
+    # looking at ("Reply in English" when the UI is English).
+    rules_bundle.language = LANGUAGE_NAME[locale]
 
     try:
         checkpointer = context.store.langgraph_checkpointer
@@ -187,6 +194,7 @@ async def handler(context):
         "task": task,
         "user_rules": rules_bundle.to_rules(),
         "auto_approve": auto_approve,
+        "locale": locale,
     }
 
     # ``single_reply`` mode: caller pinpoints the email by id, the prioritize
@@ -252,7 +260,7 @@ async def handler(context):
         await save_message(
             context,
             role="user",
-            content=f"[task] {task_label(task)}",
+            content=f"[task] {task_label(task, locale)}",
             metadata={"task": task, "kind": "task_start"},
         )
         # Title shortcut: write to ``metadata.title`` so the cross-device
@@ -263,7 +271,7 @@ async def handler(context):
         await _maybe_set_title_first_run(
             context,
             conversation_id,
-            f"[task] {task_label(task)}",
+            f"[task] {task_label(task, locale)}",
         )
 
         # First frame: session id, used by the client to later POST /email/stop
@@ -318,7 +326,7 @@ async def handler(context):
                             await save_message(
                                 context,
                                 role="assistant",
-                                content=draft_preview(draft),
+                                content=draft_preview(draft, locale),
                                 metadata={
                                     "kind": "draft_for_review",
                                     "email_id": draft.get("email_id"),

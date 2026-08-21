@@ -208,8 +208,9 @@ function StreamingBubble({
 }: {
   streaming: { phase: 'summarize' | 'draft'; text: string };
 }) {
+  const { t } = useI18n();
   const eyebrow =
-    streaming.phase === 'summarize' ? '正在写日报…' : '正在起草回复…';
+    streaming.phase === 'summarize' ? t('streamingSummary') : t('streamingDraft');
   const eyebrowIcon: IconName =
     streaming.phase === 'summarize' ? 'receipt' : 'edit-3';
   return (
@@ -535,7 +536,8 @@ function renderInlineMd(text: string): ReactNode[] {
 
 function formatTime(ts: number): string {
   const d = new Date(ts);
-  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  // No hardcoded locale — follow the browser's formatting preference.
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 // ─── kind-specific styling ──────────────────────────────────────────────────

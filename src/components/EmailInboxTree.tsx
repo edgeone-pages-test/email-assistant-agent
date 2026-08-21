@@ -198,7 +198,7 @@ export default function EmailInboxTree({
             background: filterOpen ? tokens.color.brandSoft : 'transparent',
             borderColor: filterOpen ? tokens.color.brandBorder : tokens.color.border,
           }}
-          title="展开/收起筛选"
+          title={t('filterToggleTitle')}
           aria-pressed={filterOpen}
         >
           <Icon name="search" size={12} />
@@ -212,7 +212,7 @@ export default function EmailInboxTree({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索主题/发件人..."
+              placeholder={t('searchPlaceholder')}
               style={searchInput}
             />
             {searchQuery && (
@@ -220,7 +220,7 @@ export default function EmailInboxTree({
                 type="button"
                 onClick={() => setSearchQuery('')}
                 style={clearBtn}
-                title="清空搜索"
+                title={t('clearSearchTitle')}
               >
                 <Icon name="x" size={10} strokeWidth={2.5} />
               </button>
@@ -251,14 +251,14 @@ export default function EmailInboxTree({
           </div>
           {filtered.length !== emails.length && (
             <div style={filterResult}>
-              显示 {filtered.length} / {emails.length} 封
+              {t('filterResult', { shown: filtered.length, total: emails.length })}
             </div>
           )}
         </div>
       )}
       {refreshing && (
-        <div style={refreshBanner} title="新任务正在重新拉取并分类邮件,完成后会刷新这里">
-          <span style={refreshDot} /> 正在重新拉取...
+        <div style={refreshBanner} title={t('refreshBannerTitle')}>
+          <span style={refreshDot} /> {t('refreshBannerText')}
         </div>
       )}
       <div style={treeWrap}>
@@ -411,6 +411,7 @@ function EmailRow({
 }
 
 function PriorityBadge({ n, reply }: { n: number; reply: boolean }) {
+  const { t } = useI18n();
   let color: string = tokens.color.textSubtle;
   let bg: string = tokens.color.surface;
   if (n >= 80) {
@@ -439,7 +440,7 @@ function PriorityBadge({ n, reply }: { n: number; reply: boolean }) {
         minWidth: 36,
         justifyContent: 'center',
       }}
-      title={reply ? '需要回复' : '不需要回复'}
+      title={reply ? t('needsReplyTitle') : t('noReplyNeededTitle')}
     >
       {reply && <Icon name="corner-down-left" size={9} strokeWidth={2.5} />}
       <span>{n}</span>

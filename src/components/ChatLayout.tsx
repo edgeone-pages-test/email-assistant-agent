@@ -27,6 +27,7 @@
  */
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { tokens } from '../design-tokens';
+import { useI18n } from '../i18n';
 
 interface Props {
   header: ReactNode;
@@ -68,6 +69,7 @@ export default function ChatLayout({
   const drawer = useDrawerTransition(!!historyOpen);
   const [leftWidth, setLeftWidth] = useState(280);
   const draggingRef = useRef(false);
+  const { t } = useI18n();
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -118,7 +120,7 @@ export default function ChatLayout({
           <div
             style={resizeHandle}
             onMouseDown={onMouseDown}
-            title="拖拽调整宽度"
+            title={t('resizeHandleTitle')}
           />
         )}
         <div style={{ ...col, order: compact ? 0 : 0 }}>{center}</div>
@@ -152,7 +154,7 @@ export default function ChatLayout({
                 : `transform ${EXIT_MS}ms cubic-bezier(0.4, 0, 1, 1)`,
             }}
             role="dialog"
-            aria-label="历史会话"
+            aria-label={t('historyTitle')}
           >
             {history}
           </div>
